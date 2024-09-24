@@ -1,0 +1,14 @@
+on:
+  push:
+jobs:
+  string-summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate String Summary
+        uses: ./.github/actions/summary
+        with:
+          input_string: |
+            This is a long string that we want to process.
+            It can be any string and the action will summarize it.
+          max_length: 1000000  # 1MB limit
+          summary_keyword: 'long string'
