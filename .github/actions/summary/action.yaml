@@ -2,21 +2,49 @@ name: 'String Summary with Header'
 description: 'Parses a string input to contain only ASCII characters, uses a custom summary header, skips summary and posts a message if too long, otherwise writes to GitHub summary.'
 
 inputs:
+  input_file:
+    description: 'The path to the input file to be summarized'
+    required: false
   input_string:
     description: 'The input string to be summarized'
-    required: true
+    required: false
   max_length:
     description: 'Maximum length for the string output'
     required: false
     default: '1000000'  # 1MB limit
   summary_header:
     description: 'The custom header title for the summary'
-    required: true
+    required: false
     default: 'Summary'
 
 runs:
   using: "composite"
   steps:
+
+    - name: Validate Inputs
+      shell: bash
+      run: |
+        if [[ (-z "${{ inputs.input_string }}" && -z "${{ inputs.input_file }}" ) || (-n "${{ inputs.input_string }}" && -n "${{ inputs.input_file }}" ) ]]; then
+          echo "Error: Provide either input_string or input_file, but not both."
+          exit 1
+        fi
+
+    - name: Load Input Data
+      shell: bash
+      run: |
+        if [[ -n "${{ inputs.input_file }}" ]]; then
+          # If file is provided, read the file
+          if [[ ! -f "${{ inputs.input_file }}" ]]; then
+            echo "Error: Input file '${{ inputs.input_file }}' not found."
+            exit 1
+          fi
+          INPUT_DATA=$(cat "${{ inputs.input_file }}")
+        else
+          # If string is provided, use the input string
+          INPUT_DATA="${{ inputs.input_string }}"
+        fi
+
+        echo "$INPUT_DATA" > input_data.txt
 
     - name: Process and Publish ASCII String Summary
       shell: bash
@@ -25,8 +53,15 @@ runs:
         MAX_LENGTH: ${{ inputs.max_length }}
         SUMMARY_HEADER: ${{ inputs.summary_header }}
       run: |
+        # Ensure the temporary file exists and load the content into a variable
+        if [[ ! -f input_data.txt ]]; then
+          echo "Error: input_data.txt file not found."
+          exit 1
+        fi
+
+        STRING_CONTENT=$(<input_data.txt)
         # Process the input string and filter to only contain ASCII characters
-        ASCII_STRING=$(echo "$INPUT_STRING" | tr -cd '\11\12\15\40-\176')  # Only keep ASCII chars
+        ASCII_STRING=$(echo "$STRING_CONTENT" | tr -cd '\11\12\15\40-\176')
 
         # Get the length of the ASCII string
         STRING_LENGTH=${#ASCII_STRING}
@@ -44,12 +79,10 @@ runs:
         # Write the ASCII content to GitHub step summary with a custom header
         {
           echo "## $SUMMARY_HEADER"
-          echo "summary<<${delimiter}"
-          echo "$SUMMARY_HEADER"
           echo "<details><summary>Click to expand</summary>"
+          echo ""
           echo '```'
           echo "$ASCII_STRING"
           echo '```'
           echo "</details>"
-          echo "${delimiter}"
         } >> $GITHUB_STEP_SUMMARY

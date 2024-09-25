@@ -2,9 +2,15 @@ name: 'String Summary'
 description: 'Reads and summarizes a string input, truncates if too long, and writes to GitHub summary.'
 
 inputs:
+  input_path:
+    description: 'The path to the input file to be summarized'
   input_string:
     description: 'The input string to be summarized'
     required: true
+  type:
+    description: 'The type of input to be processed'
+    required: true
+    default: 'string'
   max_length:
     description: 'Maximum length for the string output'
     required: false
@@ -24,34 +30,4 @@ runs:
         INPUT_STRING: ${{ inputs.input_string }}
         MAX_LENGTH: ${{ inputs.max_length }}
         SUMMARY_KEYWORD: ${{ inputs.summary_keyword }}
-      run: |
-        # Process the input string
-        STRING_CONTENT="$INPUT_STRING"
-        SUMMARY_HEADER=$(grep -E -i -m 1 "$SUMMARY_KEYWORD" <<< "$STRING_CONTENT")
-        STRING_LENGTH=${#STRING_CONTENT}
-        START=$((STRING_LENGTH - MAX_LENGTH))
-
-        # Truncate content if it exceeds the max length (1MB)
-        if [ "$START" -lt 0 ]; then
-          SHORT_CONTENT="$STRING_CONTENT"
-        else
-          echo ":warning: String content is too long to be displayed (${STRING_LENGTH} chars). Only the last ${MAX_LENGTH} characters will be printed."
-          SHORT_CONTENT="${STRING_CONTENT:START:MAX_LENGTH}"
-        fi
-
-        # Generate a unique delimiter
-        delimiter=$(openssl rand -hex 8)
-
-        # Write the content to GitHub step summary
-        {
-          echo "## String Summary"
-          echo "summary<<${delimiter}"
-          echo "$SUMMARY_HEADER"
-          echo "<details><summary>Click to expand</summary>"
-          echo ""
-          echo '```'
-          echo "$SHORT_CONTENT"
-          echo '```'
-          echo "</details>"
-          echo "${delimiter}"
-        } >> $GITHUB_STEP_SUMMARY
+      run: summary.sh
